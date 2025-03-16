@@ -117,7 +117,7 @@ async def get_url_analysis_report(url: str) -> str:
     domain = ipquality_response.get("domain", "N/A")
     country_code = ipquality_response.get("country_code", "N/A")
     ip_address = ipquality_response.get("ip_address", "N/A")
-    ipquality_link = f"https://www.ipqualityscore.com/url-checker/result/{clean_url}"
+    ipquality_link = f"https://www.ipqualityscore.com/domain-reputation/{clean_url}"
     
     return (f"🔍 *Báo Cáo Phân Tích URL*\n"
             f"🌐 URL: `{url}`\n"
