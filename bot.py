@@ -103,7 +103,8 @@ async def get_url_analysis_report(url: str) -> str:
     vt_link = f"https://www.virustotal.com/gui/url/{analysis_id}"
     
     # Kiểm tra với IPQualityScore
-    ipquality_url = f"https://www.ipqualityscore.com/api/json/url/{IPQUALITY_API_KEY}/{url}"
+    clean_url = url.replace("http://", "").replace("https://", "")
+    ipquality_url = f"https://www.ipqualityscore.com/api/json/url/{IPQUALITY_API_KEY}/{clean_url}"
     #ipquality_response = requests.get(ipquality_url).json()
     try:
         ipquality_response = requests.get(ipquality_url).json()
