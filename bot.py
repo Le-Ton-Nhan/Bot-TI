@@ -104,7 +104,11 @@ async def get_url_analysis_report(url: str) -> str:
     
     # Kiểm tra với IPQualityScore
     ipquality_url = f"https://www.ipqualityscore.com/api/json/url/{IPQUALITY_API_KEY}/{url}"
-    ipquality_response = requests.get(ipquality_url).json()
+    #ipquality_response = requests.get(ipquality_url).json()
+    try:
+        ipquality_response = requests.get(ipquality_url).json()
+    except requests.exceptions.JSONDecodeError:
+        return "⚠️ Không thể phân tích URL. API không trả về dữ liệu hợp lệ."
     risk_score = ipquality_response.get("risk_score", 0)
     malicious = "Yes" if ipquality_response.get("malicious", False) else "No"
     phishing = "Yes" if ipquality_response.get("phishing", False) else "No"
