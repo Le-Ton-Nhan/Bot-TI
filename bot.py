@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, CallbackContext
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# API KEYS (Set environment variables)
+# API KEYS (Read from environment variables)
 VIRUSTOTAL_API_KEY = "82a372fe87203a77e09b2e2b1ee6602d35080ca6a6247cccfb9bfaa6ae30c6a0"
 ABUSEIPDB_API_KEY = "9ad9622a23685e17cb847ae9a0a11548f758dad80d761422e79dd0ab0b5cfd345be0308829ead6b5"
 IPQUALITY_API_KEY = "n4IFLrRkwD0tPTlJiiZGJC2lZtms8mIR"
@@ -50,10 +50,24 @@ async def get_ip_analysis_report(ip: str) -> str:
     # IPQualityScore Check
     ipquality_response = requests.get(f"https://www.ipqualityscore.com/api/json/ip/{IPQUALITY_API_KEY}/{ip}", headers=headers_ipquality).json()
     fraud_score = ipquality_response.get("fraud_score", 0)
+    isp = ipquality_response.get("ISP", "N/A")
+    domain = ipquality_response.get("domain", "N/A")
+    hostname = ipquality_response.get("hostname", "N/A")
+    country = ipquality_response.get("country_name", "N/A")
+    proxy = ipquality_response.get("proxy", False)
+    vpn = ipquality_response.get("vpn", False)
+    tor = ipquality_response.get("tor", False)
+    org = ipquality_response.get("organization", "N/A")
     ipquality_link = f"https://www.ipqualityscore.com/free-ip-lookup-proxy-vpn-test/lookup/{ip}"
 
     return (f"🔍 *Báo Cáo Phân Tích IP*\n"
-            f"IP: `{ip}`\n\n"
+            f"IP: `{ip}`\n"
+            f"ISP: {isp}\n"
+            f"Domain: {domain}\n"
+            f"Hostname: {hostname}\n"
+            f"Country Name: {country}\n"
+            f"Proxy: {proxy} | VPN: {vpn} | Tor: {tor}\n"
+            f"Org: {org}\n\n"
             f"🌐 *VirusTotal:* {vt_score} / 100 🔴 - [Xem chi tiết]({vt_link})\n"
             f"🚨 *AbuseIPDB:* {abuse_score} / 100 ⚠️ - [Xem chi tiết]({abuse_link})\n"
             f"⚡ *IPQualityScore:* {fraud_score} / 100 🛑 - [Xem chi tiết]({ipquality_link})")
