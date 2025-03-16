@@ -114,13 +114,19 @@ async def get_url_analysis_report(url: str) -> str:
     malicious = "Yes" if ipquality_response.get("malicious", False) else "No"
     phishing = "Yes" if ipquality_response.get("phishing", False) else "No"
     suspicious = "Yes" if ipquality_response.get("suspicious", False) else "No"
-    ipquality_link = f"https://www.ipqualityscore.com/url-checker/result/{url}"
+    domain = ipquality_response.get("domain", "N/A")
+    country_code = ipquality_response.get("country_code", "N/A")
+    ip_address = ipquality_response.get("ip_address", "N/A")
+    ipquality_link = f"https://www.ipqualityscore.com/url-checker/result/{clean_url}"
     
     return (f"🔍 *Báo Cáo Phân Tích URL*\n"
             f"🌐 URL: `{url}`\n"
             f"🚨 VirusTotal: {malicious_count} báo cáo độc hại 🔴 - [Xem chi tiết]({vt_link})\n"
             f"⚡ *IPQualityScore:* Risk Score: {risk_score} / 100 🛑\n"
             f"- Malicious: {malicious} | Phishing: {phishing} | Suspicious: {suspicious}\n"
+            f"- Domain: {domain}\n"
+            f"- Country_code: {country_code}\n"
+            f"- Ip_address: {ip_address}\n"
             f"[Xem chi tiết]({ipquality_link})")
 
 # Kiểm tra hash file
