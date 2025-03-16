@@ -81,9 +81,11 @@ async def get_ip_analysis_report(ip: str) -> str:
 # Kiểm tra URL
 async def analyze_url(update: Update, context: CallbackContext) -> None:
     if not context.args:
-        await update.message.reply_text("Vui lòng nhập URL. Ví dụ: /analyze_url https://example.com")
+        await update.message.reply_text("Vui lòng nhập URL. Ví dụ: /analyze_url example.com")
         return
     url = context.args[0]
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "http://" + url  # Thêm http:// nếu chỉ nhập domain
     report = await get_url_analysis_report(url)
     await update.message.reply_text(report, disable_web_page_preview=True)
 
@@ -99,7 +101,22 @@ async def get_url_analysis_report(url: str) -> str:
     analysis_result = requests.get(f"https://www.virustotal.com/api/v3/analyses/{analysis_id}", headers=headers_vt).json()
     malicious_count = analysis_result.get("data", {}).get("attributes", {}).get("stats", {}).get("malicious", 0)
     vt_link = f"https://www.virustotal.com/gui/url/{analysis_id}"
-    return f"🔍 *Báo Cáo Phân Tích URL*\n🌐 URL: `{url}`\n🚨 VirusTotal: {malicious_count} báo cáo độc hại 🔴\n[Xem chi tiết]({vt_link})"
+    
+    # Kiểm tra với IPQualityScore
+    ipquality_url = f"https://www.ipqualityscore.com/api/json/url/{IPQUALITY_API_KEY}/{url}"
+    ipquality_response = requests.get(ipquality_url).json()
+    risk_score = ipquality_response.get("risk_score", 0)
+    malicious = "Yes" if ipquality_response.get("malicious", False) else "No"
+    phishing = "Yes" if ipquality_response.get("phishing", False) else "No"
+    suspicious = "Yes" if ipquality_response.get("suspicious", False) else "No"
+    ipquality_link = f"https://www.ipqualityscore.com/url-checker/result/{url}"
+    
+    return (f"🔍 *Báo Cáo Phân Tích URL*\n"
+            f"🌐 URL: `{url}`\n"
+            f"🚨 VirusTotal: {malicious_count} báo cáo độc hại 🔴 - [Xem chi tiết]({vt_link})\n"
+            f"⚡ *IPQualityScore:* Risk Score: {risk_score} / 100 🛑\n"
+            f"- Malicious: {malicious} | Phishing: {phishing} | Suspicious: {suspicious}\n"
+            f"[Xem chi tiết]({ipquality_link})")
 
 # Kiểm tra hash file
 async def analyze_hash(update: Update, context: CallbackContext) -> None:
