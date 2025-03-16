@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQ
 # Lấy API keys từ biến môi trường
 TELEGRAM_BOT_TOKEN = "7923484184:AAHmqEl9yCUd4TNOlWZfyhlWz6bJbl7e0pg"
 VT_API_KEY = "82a372fe87203a77e09b2e2b1ee6602d35080ca6a6247cccfb9bfaa6ae30c6a0"
-ABUSEIPDB_API_KEY = 9ad9622a23685e17cb847ae9a0a11548f758dad80d761422e79dd0ab0b5cfd345be0308829ead6b5
+ABUSEIPDB_API_KEY = "9ad9622a23685e17cb847ae9a0a11548f758dad80d761422e79dd0ab0b5cfd345be0308829ead6b5"
 
 # Hàm kiểm tra thông tin trên VirusTotal
 async def check_virustotal(update: Update, context: CallbackContext, query: str):
