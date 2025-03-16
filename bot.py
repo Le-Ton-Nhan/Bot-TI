@@ -3,8 +3,13 @@ import requests
 import base64
 import re
 
-from telegram import Update, ParseMode, BotCommand
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram import Update, BotCommand
+from telegram.constants import ParseMode
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes
+)
 
 # ====== ĐIỀN API KEY CHO CÁC DỊCH VỤ DƯỚI ĐÂY ======
 VT_API_KEY = "82a372fe87203a77e09b2e2b1ee6602d35080ca6a6247cccfb9bfaa6ae30c6a0"
@@ -32,7 +37,6 @@ def analyze_ip(ip: str) -> str:
     Gọi các API để phân tích IP và trả về báo cáo dạng Markdown.
     Sử dụng: VirusTotal, AbuseIPDB, IPQualityScore, IBM X-Force Exchange (tùy chọn).
     """
-
     # ---------------------------------------------
     # VirusTotal - IP
     # ---------------------------------------------
@@ -46,7 +50,6 @@ def analyze_ip(ip: str) -> str:
             vt_stats = vt_attr.get("last_analysis_stats", {})
             vt_malicious = vt_stats.get("malicious", 0)
             vt_suspicious = vt_stats.get("suspicious", 0)
-            # Community Score chỉ là ví dụ minh hoạ, bạn có thể tùy biến
             community_score = f"{vt_malicious}/{vt_malicious + vt_suspicious}" if (vt_malicious+vt_suspicious) else "0"
         else:
             community_score = "N/A"
@@ -90,7 +93,6 @@ def analyze_ip(ip: str) -> str:
             fraud_score = ipq_data.get("fraud_score", "N/A")
             org = ipq_data.get("organization", "N/A")
             domain = ipq_data.get("host", "N/A")
-            # Lấy thêm 1-2 trường để hiển thị
             connection_type = ipq_data.get("connection_type", "N/A")
         else:
             isp = country = proxy = vpn = tor = fraud_score = org = domain = connection_type = "N/A"
@@ -105,9 +107,7 @@ def analyze_ip(ip: str) -> str:
     try:
         ibm_resp = requests.get(ibm_url, auth=(IBM_XFORCE_API_KEY, IBM_XFORCE_PASSWORD))
         if ibm_resp.status_code == 200:
-            # Tùy vào dữ liệu IBM trả về mà bạn parse
             ibm_data = ibm_resp.json()
-            # Chỉ minh hoạ: Lấy score, category, ...
             ibm_score = ibm_data.get("score", "N/A")
         elif ibm_resp.status_code == 403:
             ibm_score = "Hết free"
@@ -125,7 +125,7 @@ def analyze_ip(ip: str) -> str:
         f"IP: `{ip}`\n"
         f"ISP: {isp}\n"
         f"Domain: {domain}\n"
-        f"Hostname: N/A\n"  # Có thể lấy từ VirusTotal hoặc IPQualityScore, tuỳ API
+        f"Hostname: N/A\n"
         f"Country: {country}\n"
         f"Type: {connection_type}\n"
         f"Proxy: {proxy} | VPN: {vpn} | Tor: {tor}\n"
@@ -144,12 +144,8 @@ def analyze_ip(ip: str) -> str:
 def analyze_url(url: str) -> str:
     """
     Phân tích URL qua VirusTotal, IPQualityScore, IBM X-Force Exchange.
-    (AbuseIPDB chỉ dành cho IP, MalwareBazaar chủ yếu cho hash.)
     """
-    # ---------------------------------------------
     # VirusTotal - URL
-    # ---------------------------------------------
-    # URL cần được mã hoá base64 (không padding) để gọi API /urls/{id}
     url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
     vt_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
     vt_headers = {"x-apikey": VT_API_KEY}
@@ -168,16 +164,12 @@ def analyze_url(url: str) -> str:
         logger.error(f"VirusTotal URL error: {e}")
         vt_score = "N/A"
 
-    # ---------------------------------------------
     # IBM X-Force Exchange - URL
-    # ---------------------------------------------
     ibm_url = f"https://api.xforce.ibmcloud.com/url/{url}"
     try:
         ibm_resp = requests.get(ibm_url, auth=(IBM_XFORCE_API_KEY, IBM_XFORCE_PASSWORD))
         if ibm_resp.status_code == 200:
-            # Parse JSON theo nhu cầu
             ibm_data = ibm_resp.json()
-            # Thí dụ: Lấy score
             ibm_score = ibm_data.get("result", {}).get("score", "N/A")
         elif ibm_resp.status_code == 403:
             ibm_score = "Hết free"
@@ -187,16 +179,9 @@ def analyze_url(url: str) -> str:
         logger.error(f"IBM X-Force URL error: {e}")
         ibm_score = "N/A"
 
-    # ---------------------------------------------
-    # IPQualityScore - URL
-    # ---------------------------------------------
-    # IPQualityScore có endpoint riêng cho URL, hoặc bạn dùng link check
+    # IPQualityScore - URL (demo link)
     ipq_link = f"https://www.ipqualityscore.com/threat-feeds/malicious-url-scanner/{url}"
-    # Nếu bạn có API endpoint, bạn có thể gọi. Ở đây chỉ demo link hiển thị.
 
-    # ---------------------------------------------
-    # Tạo báo cáo
-    # ---------------------------------------------
     report = (
         f"*Báo Cáo Phân Tích URL*\n"
         f"URL: `{url}`\n\n"
@@ -210,12 +195,9 @@ def analyze_url(url: str) -> str:
 
 def analyze_domain(domain: str) -> str:
     """
-    Phân tích domain. Có thể sử dụng VirusTotal, IBM X-Force Exchange, IPQualityScore.
-    AbuseIPDB không áp dụng trực tiếp cho domain, MalwareBazaar chủ yếu cho hash.
+    Phân tích domain (VirusTotal, IBM X-Force Exchange, IPQualityScore).
     """
-    # ---------------------------------------------
     # VirusTotal - Domain
-    # ---------------------------------------------
     vt_url = f"https://www.virustotal.com/api/v3/domains/{domain}"
     vt_headers = {"x-apikey": VT_API_KEY}
     try:
@@ -233,9 +215,7 @@ def analyze_domain(domain: str) -> str:
         logger.error(f"VirusTotal domain error: {e}")
         vt_score = "N/A"
 
-    # ---------------------------------------------
     # IBM X-Force Exchange - Domain
-    # ---------------------------------------------
     ibm_url = f"https://api.xforce.ibmcloud.com/url/{domain}"
     try:
         ibm_resp = requests.get(ibm_url, auth=(IBM_XFORCE_API_KEY, IBM_XFORCE_PASSWORD))
@@ -250,10 +230,7 @@ def analyze_domain(domain: str) -> str:
         logger.error(f"IBM X-Force domain error: {e}")
         ibm_score = "N/A"
 
-    # ---------------------------------------------
     # IPQualityScore - Domain
-    # ---------------------------------------------
-    # IPQualityScore có API cho domain, hoặc bạn có thể check link
     ipq_link = f"https://www.ipqualityscore.com/threat-feeds/malicious-url-scanner/{domain}"
 
     report = (
@@ -269,11 +246,9 @@ def analyze_domain(domain: str) -> str:
 
 def analyze_hash(file_hash: str) -> str:
     """
-    Phân tích hash (MD5/SHA1/SHA256) thông qua VirusTotal, MalwareBazaar, IBM X-Force Exchange.
+    Phân tích hash (MD5/SHA1/SHA256) qua VirusTotal, MalwareBazaar, IBM X-Force Exchange.
     """
-    # ---------------------------------------------
     # VirusTotal - file hash
-    # ---------------------------------------------
     vt_url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
     vt_headers = {"x-apikey": VT_API_KEY}
     try:
@@ -291,9 +266,7 @@ def analyze_hash(file_hash: str) -> str:
         logger.error(f"VirusTotal hash error: {e}")
         vt_score = "N/A"
 
-    # ---------------------------------------------
     # MalwareBazaar
-    # ---------------------------------------------
     mb_url = "https://mb-api.abuse.ch/api/v1/"
     mb_data = {"query": "get_info", "hash": file_hash}
     mb_headers = {"API-KEY": MALWARE_BAZAAR_API_KEY} if MALWARE_BAZAAR_API_KEY else {}
@@ -308,10 +281,7 @@ def analyze_hash(file_hash: str) -> str:
         logger.error(f"MalwareBazaar error: {e}")
         mb_query_status = "N/A"
 
-    # ---------------------------------------------
     # IBM X-Force Exchange - hash
-    # ---------------------------------------------
-    # Lưu ý: IBM X-Force có thể tra cứu hash (endpoint: /malware/{hash})
     ibm_url = f"https://api.xforce.ibmcloud.com/malware/{file_hash}"
     try:
         ibm_resp = requests.get(ibm_url, auth=(IBM_XFORCE_API_KEY, IBM_XFORCE_PASSWORD))
@@ -339,10 +309,9 @@ def analyze_hash(file_hash: str) -> str:
 
 def analyze_email(email: str) -> str:
     """
-    Demo phân tích email. Các dịch vụ nêu trên không chuyên cho email,
-    bạn có thể tùy biến thêm EmailRep.io hoặc API khác. Ở đây chỉ minh hoạ.
+    Demo phân tích email. (Các dịch vụ trên không chuyên cho email,
+    bạn có thể tích hợp EmailRep.io hoặc dịch vụ khác nếu cần.)
     """
-    # Tạm thời, ta chỉ trả về chuỗi đơn giản. Tuỳ nhu cầu bạn mở rộng thêm.
     report = (
         f"*Báo Cáo Phân Tích Email*\n"
         f"Email: `{email}`\n\n"
@@ -355,9 +324,9 @@ def analyze_email(email: str) -> str:
 #                               CÁC HÀM XỬ LÝ LỆNH
 # ------------------------------------------------------------------------------------
 
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /start: Chào mừng."""
-    update.message.reply_text(
+    await update.message.reply_text(
         "Chào bạn! Hãy dùng các lệnh sau để phân tích:\n"
         "/analyze_ip <IP>\n"
         "/analyze_url <URL>\n"
@@ -366,70 +335,90 @@ def start(update: Update, context: CallbackContext) -> None:
         "/analyze_email <email>\n"
     )
 
-def analyze_ip_command(update: Update, context: CallbackContext) -> None:
+async def analyze_ip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_ip <IP>."""
     if not context.args:
-        update.message.reply_text("Vui lòng nhập IP sau lệnh, ví dụ: /analyze_ip 8.8.8.8")
+        await update.message.reply_text("Vui lòng nhập IP sau lệnh, ví dụ: /analyze_ip 8.8.8.8")
         return
     ip = context.args[0]
     report = analyze_ip(ip)
-    update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        report,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
-def analyze_url_command(update: Update, context: CallbackContext) -> None:
+async def analyze_url_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_url <URL>."""
     if not context.args:
-        update.message.reply_text("Vui lòng nhập URL sau lệnh, ví dụ: /analyze_url google.com")
+        await update.message.reply_text("Vui lòng nhập URL sau lệnh, ví dụ: /analyze_url google.com")
         return
     url = context.args[0]
     report = analyze_url(url)
-    update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        report,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
-def analyze_domain_command(update: Update, context: CallbackContext) -> None:
+async def analyze_domain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_domain <domain>."""
     if not context.args:
-        update.message.reply_text("Vui lòng nhập domain sau lệnh, ví dụ: /analyze_domain example.com")
+        await update.message.reply_text("Vui lòng nhập domain sau lệnh, ví dụ: /analyze_domain example.com")
         return
     domain = context.args[0]
     report = analyze_domain(domain)
-    update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        report,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
-def analyze_hash_command(update: Update, context: CallbackContext) -> None:
+async def analyze_hash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_hash <file_hash>."""
     if not context.args:
-        update.message.reply_text("Vui lòng nhập hash sau lệnh, ví dụ: /analyze_hash 44d88612fea8a8f36de82e1278abb02f")
+        await update.message.reply_text("Vui lòng nhập hash sau lệnh, ví dụ: /analyze_hash 44d88612fea8a8f36de82e1278abb02f")
         return
     file_hash = context.args[0]
     report = analyze_hash(file_hash)
-    update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        report,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
-def analyze_email_command(update: Update, context: CallbackContext) -> None:
+async def analyze_email_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_email <email>."""
     if not context.args:
-        update.message.reply_text("Vui lòng nhập email sau lệnh, ví dụ: /analyze_email someone@example.com")
+        await update.message.reply_text("Vui lòng nhập email sau lệnh, ví dụ: /analyze_email someone@example.com")
         return
     email = context.args[0]
     report = analyze_email(email)
-    update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        report,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+    )
 
 # ------------------------------------------------------------------------------------
 #                               HÀM CHẠY CHÍNH
 # ------------------------------------------------------------------------------------
 
-def main():
+async def main():
     # Thay "YOUR_TELEGRAM_BOT_TOKEN" bằng token bot của bạn
-    updater = Updater("7923484184:AAHmqEl9yCUd4TNOlWZfyhlWz6bJbl7e0pg", use_context=True)
-    dispatcher = updater.dispatcher
+    bot_token = "7923484184:AAHmqEl9yCUd4TNOlWZfyhlWz6bJbl7e0pg"
+    application = ApplicationBuilder().token(bot_token).build()
 
-    # Đăng ký các lệnh
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("analyze_ip", analyze_ip_command))
-    dispatcher.add_handler(CommandHandler("analyze_url", analyze_url_command))
-    dispatcher.add_handler(CommandHandler("analyze_domain", analyze_domain_command))
-    dispatcher.add_handler(CommandHandler("analyze_hash", analyze_hash_command))
-    dispatcher.add_handler(CommandHandler("analyze_email", analyze_email_command))
+    # Đăng ký handler cho các lệnh
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("analyze_ip", analyze_ip_command))
+    application.add_handler(CommandHandler("analyze_url", analyze_url_command))
+    application.add_handler(CommandHandler("analyze_domain", analyze_domain_command))
+    application.add_handler(CommandHandler("analyze_hash", analyze_hash_command))
+    application.add_handler(CommandHandler("analyze_email", analyze_email_command))
 
-    # Đặt menu lệnh (hiện trên Telegram khi bấm /)
-    dispatcher.bot.set_my_commands([
+    # Đặt menu lệnh (hiển thị khi gõ '/')
+    await application.bot.set_my_commands([
         BotCommand("start", "Bắt đầu"),
         BotCommand("analyze_ip", "Phân tích thông tin IP"),
         BotCommand("analyze_url", "Kiểm tra thông tin URL"),
@@ -439,8 +428,9 @@ def main():
     ])
 
     # Bắt đầu bot
-    updater.start_polling()
-    updater.idle()
+    await application.run_polling()
+
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
