@@ -18,7 +18,6 @@ IBM_XFORCE_API_KEY = "41a9d14f-eb40-4402-b3ed-bcd88f5ac15e"
 IBM_XFORCE_PASSWORD = "ec784682-e98d-4575-b48b-536e9d5c094f"
 MALWARE_BAZAAR_API_KEY = "3fa505986c79223ae986f72890bef05fb77a1b8e64c3ac8f"
 IPQUALITY_API_KEY = "n4IFLrRkwD0tPTlJiiZGJC2lZtms8mIR"
-
 # ==================================================
 
 # Cấu hình logging
@@ -35,11 +34,9 @@ logger = logging.getLogger(__name__)
 def analyze_ip(ip: str) -> str:
     """
     Gọi các API để phân tích IP và trả về báo cáo dạng Markdown.
-    Sử dụng: VirusTotal, AbuseIPDB, IPQualityScore, IBM X-Force Exchange (tùy chọn).
+    Sử dụng: VirusTotal, AbuseIPDB, IPQualityScore, IBM X-Force Exchange.
     """
-    # ---------------------------------------------
     # VirusTotal - IP
-    # ---------------------------------------------
     vt_url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip}"
     vt_headers = {"x-apikey": VT_API_KEY}
     try:
@@ -50,22 +47,17 @@ def analyze_ip(ip: str) -> str:
             vt_stats = vt_attr.get("last_analysis_stats", {})
             vt_malicious = vt_stats.get("malicious", 0)
             vt_suspicious = vt_stats.get("suspicious", 0)
-            community_score = f"{vt_malicious}/{vt_malicious + vt_suspicious}" if (vt_malicious+vt_suspicious) else "0"
+            community_score = f"{vt_malicious}/{vt_malicious + vt_suspicious}" if (vt_malicious + vt_suspicious) else "0"
         else:
             community_score = "N/A"
     except Exception as e:
         logger.error(f"VirusTotal IP error: {e}")
         community_score = "N/A"
 
-    # ---------------------------------------------
     # AbuseIPDB
-    # ---------------------------------------------
     abuse_url = "https://api.abuseipdb.com/api/v2/check"
     abuse_params = {"ipAddress": ip, "maxAgeInDays": 90}
-    abuse_headers = {
-        "Key": ABUSEIPDB_API_KEY,
-        "Accept": "application/json"
-    }
+    abuse_headers = {"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"}
     try:
         abuse_resp = requests.get(abuse_url, headers=abuse_headers, params=abuse_params)
         if abuse_resp.status_code == 200:
@@ -77,9 +69,7 @@ def analyze_ip(ip: str) -> str:
         logger.error(f"AbuseIPDB error: {e}")
         abuse_confidence = "N/A"
 
-    # ---------------------------------------------
     # IPQualityScore
-    # ---------------------------------------------
     ipq_url = f"https://ipqualityscore.com/api/json/ip/{IPQUALITY_API_KEY}/{ip}"
     try:
         ipq_resp = requests.get(ipq_url)
@@ -100,9 +90,7 @@ def analyze_ip(ip: str) -> str:
         logger.error(f"IPQualityScore error: {e}")
         isp = country = proxy = vpn = tor = fraud_score = org = domain = connection_type = "N/A"
 
-    # ---------------------------------------------
     # IBM X-Force Exchange (tùy chọn)
-    # ---------------------------------------------
     ibm_url = f"https://api.xforce.ibmcloud.com/ipr/{ip}"
     try:
         ibm_resp = requests.get(ibm_url, auth=(IBM_XFORCE_API_KEY, IBM_XFORCE_PASSWORD))
@@ -117,9 +105,6 @@ def analyze_ip(ip: str) -> str:
         logger.error(f"IBM X-Force IP error: {e}")
         ibm_score = "N/A"
 
-    # ---------------------------------------------
-    # Tạo báo cáo
-    # ---------------------------------------------
     report = (
         f"*Báo Cáo Phân Tích IP*\n"
         f"IP: `{ip}`\n"
@@ -130,9 +115,9 @@ def analyze_ip(ip: str) -> str:
         f"Type: {connection_type}\n"
         f"Proxy: {proxy} | VPN: {vpn} | Tor: {tor}\n"
         f"Org: {org}\n\n"
-        f"*VirusTotal:* Community Score: {community_score} {'🟢' if community_score in ['0','0/0'] else '🔴'} "
+        f"*VirusTotal:* Community Score: {community_score} {'🟢' if community_score in ['0', '0/0'] else '🔴'} "
         f"- [View Detail](https://www.virustotal.com/gui/ip-address/{ip})\n"
-        f"*AbuseIPDB:* Confidence Score: {abuse_confidence}% {'🟢' if str(abuse_confidence) in ['0','N/A'] else '🔴'} "
+        f"*AbuseIPDB:* Confidence Score: {abuse_confidence}% {'🟢' if str(abuse_confidence) in ['0', 'N/A'] else '🔴'} "
         f"- [View Detail](https://www.abuseipdb.com/check/{ip})\n"
         f"*IPQualityScore:* Fraud Score: {fraud_score}% {'🟢' if isinstance(fraud_score, int) and fraud_score < 70 else '🔴'} "
         f"- [View Detail](https://www.ipqualityscore.com/free-ip-lookup-proxy-vpn-test/lookup/{ip})\n"
@@ -145,7 +130,7 @@ def analyze_url(url: str) -> str:
     """
     Phân tích URL qua VirusTotal, IPQualityScore, IBM X-Force Exchange.
     """
-    # VirusTotal - URL
+    # VirusTotal yêu cầu URL được mã hoá base64 (không padding)
     url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
     vt_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
     vt_headers = {"x-apikey": VT_API_KEY}
@@ -185,7 +170,7 @@ def analyze_url(url: str) -> str:
     report = (
         f"*Báo Cáo Phân Tích URL*\n"
         f"URL: `{url}`\n\n"
-        f"*VirusTotal:* Community Score: {vt_score} {'🔴' if vt_score not in ['0','0/0','N/A'] else '🟢'} "
+        f"*VirusTotal:* Community Score: {vt_score} {'🔴' if vt_score not in ['0', '0/0', 'N/A'] else '🟢'} "
         f"- [View Detail](https://www.virustotal.com/gui/url/{url_id})\n"
         f"*IBM X-Force Exchange:* {ibm_score} - [View Detail](https://exchange.xforce.ibmcloud.com/url/{url})\n"
         f"*IPQualityScore:* - [View Detail]({ipq_link})\n"
@@ -195,7 +180,7 @@ def analyze_url(url: str) -> str:
 
 def analyze_domain(domain: str) -> str:
     """
-    Phân tích domain (VirusTotal, IBM X-Force Exchange, IPQualityScore).
+    Phân tích domain qua VirusTotal, IBM X-Force Exchange, IPQualityScore.
     """
     # VirusTotal - Domain
     vt_url = f"https://www.virustotal.com/api/v3/domains/{domain}"
@@ -230,13 +215,13 @@ def analyze_domain(domain: str) -> str:
         logger.error(f"IBM X-Force domain error: {e}")
         ibm_score = "N/A"
 
-    # IPQualityScore - Domain
+    # IPQualityScore - Domain (demo link)
     ipq_link = f"https://www.ipqualityscore.com/threat-feeds/malicious-url-scanner/{domain}"
 
     report = (
         f"*Báo Cáo Phân Tích Domain*\n"
         f"Domain: `{domain}`\n\n"
-        f"*VirusTotal:* Community Score: {vt_score} {'🔴' if vt_score not in ['0','0/0','N/A'] else '🟢'} "
+        f"*VirusTotal:* Community Score: {vt_score} {'🔴' if vt_score not in ['0', '0/0', 'N/A'] else '🟢'} "
         f"- [View Detail](https://www.virustotal.com/gui/domain/{domain})\n"
         f"*IBM X-Force Exchange:* {ibm_score} - [View Detail](https://exchange.xforce.ibmcloud.com/url/{domain})\n"
         f"*IPQualityScore:* - [View Detail]({ipq_link})\n"
@@ -299,7 +284,7 @@ def analyze_hash(file_hash: str) -> str:
     report = (
         f"*Báo Cáo Phân Tích Hash*\n"
         f"Hash: `{file_hash}`\n\n"
-        f"*VirusTotal:* Detection: {vt_score} {'🔴' if vt_score not in ['0','0/0','N/A'] else '🟢'} "
+        f"*VirusTotal:* Detection: {vt_score} {'🔴' if vt_score not in ['0', '0/0', 'N/A'] else '🟢'} "
         f"- [View Detail](https://www.virustotal.com/gui/file/{file_hash})\n"
         f"*MalwareBazaar:* Trạng thái: {mb_query_status}\n"
         f"*IBM X-Force Exchange:* Malware Family: {ibm_malware_family} - [View Detail](https://exchange.xforce.ibmcloud.com/malware/{file_hash})\n"
@@ -309,8 +294,7 @@ def analyze_hash(file_hash: str) -> str:
 
 def analyze_email(email: str) -> str:
     """
-    Demo phân tích email. (Các dịch vụ trên không chuyên cho email,
-    bạn có thể tích hợp EmailRep.io hoặc dịch vụ khác nếu cần.)
+    Demo phân tích email.
     """
     report = (
         f"*Báo Cáo Phân Tích Email*\n"
@@ -342,11 +326,7 @@ async def analyze_ip_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     ip = context.args[0]
     report = analyze_ip(ip)
-    await update.message.reply_text(
-        report,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
 
 async def analyze_url_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_url <URL>."""
@@ -355,11 +335,7 @@ async def analyze_url_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     url = context.args[0]
     report = analyze_url(url)
-    await update.message.reply_text(
-        report,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
 
 async def analyze_domain_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_domain <domain>."""
@@ -368,11 +344,7 @@ async def analyze_domain_command(update: Update, context: ContextTypes.DEFAULT_T
         return
     domain = context.args[0]
     report = analyze_domain(domain)
-    await update.message.reply_text(
-        report,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
 
 async def analyze_hash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_hash <file_hash>."""
@@ -381,11 +353,7 @@ async def analyze_hash_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     file_hash = context.args[0]
     report = analyze_hash(file_hash)
-    await update.message.reply_text(
-        report,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
 
 async def analyze_email_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Lệnh /analyze_email <email>."""
@@ -394,18 +362,14 @@ async def analyze_email_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
     email = context.args[0]
     report = analyze_email(email)
-    await update.message.reply_text(
-        report,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
-    )
+    await update.message.reply_text(report, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
 
 # ------------------------------------------------------------------------------------
 #                               HÀM CHẠY CHÍNH
 # ------------------------------------------------------------------------------------
 
 async def main():
-    # Thay "YOUR_TELEGRAM_BOT_TOKEN" bằng token bot của bạn
+    # Thay token bot của bạn
     bot_token = "7923484184:AAHmqEl9yCUd4TNOlWZfyhlWz6bJbl7e0pg"
     application = ApplicationBuilder().token(bot_token).build()
 
@@ -430,7 +394,13 @@ async def main():
     # Bắt đầu bot
     await application.run_polling()
 
-
 if __name__ == "__main__":
+    # Nếu chạy trong môi trường đã có event loop (ví dụ: Jupyter), hãy cài đặt nest_asyncio:
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except ImportError:
+        pass
+
     import asyncio
     asyncio.run(main())
