@@ -78,11 +78,53 @@ async def get_ip_analysis_report(ip: str) -> str:
             f"🚨 *AbuseIPDB:* {abuse_score} / 100 ⚠️ - [Xem chi tiết]({abuse_link})\n"
             f"⚡ *IPQualityScore:* {fraud_score} / 100 🛑 - [Xem chi tiết](https://www.ipqualityscore.com/free-ip-lookup-proxy-vpn-test/lookup/{ip})")
 
+# Kiểm tra URL
+async def analyze_url(update: Update, context: CallbackContext) -> None:
+    if not context.args:
+        await update.message.reply_text("Vui lòng nhập URL. Ví dụ: /analyze_url https://example.com")
+        return
+    url = context.args[0]
+    report = await get_url_analysis_report(url)
+    await update.message.reply_text(report, disable_web_page_preview=True)
+
+async def get_url_analysis_report(url: str) -> str:
+    headers_vt = {"x-apikey": VIRUSTOTAL_API_KEY}
+    payload = {"url": url}
+    response = requests.post("https://www.virustotal.com/api/v3/urls", headers=headers_vt, data=payload).json()
+    analysis_id = response.get("data", {}).get("id")
+    
+    if not analysis_id:
+        return "❌ Không thể phân tích URL này."
+
+    analysis_result = requests.get(f"https://www.virustotal.com/api/v3/analyses/{analysis_id}", headers=headers_vt).json()
+    malicious_count = analysis_result.get("data", {}).get("attributes", {}).get("stats", {}).get("malicious", 0)
+    vt_link = f"https://www.virustotal.com/gui/url/{analysis_id}"
+    return f"🔍 *Báo Cáo Phân Tích URL*\n🌐 URL: `{url}`\n🚨 VirusTotal: {malicious_count} báo cáo độc hại 🔴\n[Xem chi tiết]({vt_link})"
+
+# Kiểm tra hash file
+async def analyze_hash(update: Update, context: CallbackContext) -> None:
+    if not context.args:
+        await update.message.reply_text("Vui lòng nhập hash. Ví dụ: /analyze_hash d41d8cd98f00b204e9800998ecf8427e")
+        return
+    file_hash = context.args[0]
+    report = await get_hash_analysis_report(file_hash)
+    await update.message.reply_text(report, disable_web_page_preview=True)
+
+async def get_hash_analysis_report(file_hash: str) -> str:
+    headers_vt = {"x-apikey": VIRUSTOTAL_API_KEY}
+    response = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers_vt).json()
+    stats = response.get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
+    malicious_count = stats.get("malicious", 0)
+    vt_link = f"https://www.virustotal.com/gui/file/{file_hash}"
+    return f"🔍 *Báo Cáo Phân Tích Hash*\n📁 Hash: `{file_hash}`\n🚨 VirusTotal: {malicious_count} độc hại 🔴\n[Xem chi tiết]({vt_link})"
+
 def main():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("analyze_ip", analyze_ip))
+    application.add_handler(CommandHandler("analyze_url", analyze_url))
+    application.add_handler(CommandHandler("analyze_hash", analyze_hash))
 
     application.run_polling()
 
