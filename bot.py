@@ -42,12 +42,11 @@ async def get_ip_analysis_report(ip: str) -> str:
     ipquality_response = requests.get(ipquality_url, headers=headers_ipquality).json()
     
     isp = ipquality_response.get("ISP", "N/A")
-    domain = ipquality_response.get("domain", "N/A")
-    hostname = ipquality_response.get("hostname", "N/A")
+    domain = ipquality_response.get("host", "N/A")
     country = ipquality_response.get("country_code", "N/A")
     city = ipquality_response.get("city", "N/A")
     region = ipquality_response.get("region", "N/A")
-    proxy = "Yes" if ipquality_response.get("PROXY", False) else "No"
+    proxy = "Yes" if ipquality_response.get("proxy", False) else "No"
     vpn = "Yes" if ipquality_response.get("vpn", False) else "No"
     tor = "Yes" if ipquality_response.get("tor", False) else "No"
     org = ipquality_response.get("organization", "N/A")
@@ -67,7 +66,6 @@ async def get_ip_analysis_report(ip: str) -> str:
             f"IP: `{ip}`\n"
             f"ISP: {isp}\n"
             f"Domain: {domain}\n"
-            f"Hostname: {hostname}\n"
             f"Country: {country}\n"
             f"City: {city}\n"
             f"Region: {region}\n"
