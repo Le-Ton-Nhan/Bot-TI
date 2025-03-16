@@ -46,6 +46,7 @@ async def get_ip_analysis_report(ip: str) -> str:
     country = ipquality_response.get("country_code", "N/A")
     city = ipquality_response.get("city", "N/A")
     region = ipquality_response.get("region", "N/A")
+    timezone = ipquality_response.get("timezone", "N/A")
     proxy = "Yes" if ipquality_response.get("proxy", False) else "No"
     vpn = "Yes" if ipquality_response.get("vpn", False) else "No"
     tor = "Yes" if ipquality_response.get("tor", False) else "No"
@@ -69,6 +70,7 @@ async def get_ip_analysis_report(ip: str) -> str:
             f"Country: {country}\n"
             f"City: {city}\n"
             f"Region: {region}\n"
+            f"Timezone: {timezone}\n"
             f"Proxy: {proxy} | VPN: {vpn} | Tor: {tor}\n"
             f"Org: {org}\n"
             f"\n"
