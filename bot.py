@@ -1,106 +1,63 @@
 import os
-import re
 import requests
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext
 
-# Lấy API keys từ biến môi trường
+# Thay thế bằng API Key của bạn
 TELEGRAM_BOT_TOKEN = "7923484184:AAHmqEl9yCUd4TNOlWZfyhlWz6bJbl7e0pg"
 VT_API_KEY = "82a372fe87203a77e09b2e2b1ee6602d35080ca6a6247cccfb9bfaa6ae30c6a0"
 ABUSEIPDB_API_KEY = "9ad9622a23685e17cb847ae9a0a11548f758dad80d761422e79dd0ab0b5cfd345be0308829ead6b5"
+IBM_XFORCE_API_KEY = "41a9d14f-eb40-4402-b3ed-bcd88f5ac15e"
+IBM_XFORCE_PASSWORD = "ec784682-e98d-4575-b48b-536e9d5c094f"
 
-# Xác định loại dữ liệu (IP, URL, Hash, Email, Domain)
-def detect_input_type(value):
-    ip_pattern = r"^\d{1,3}(\.\d{1,3}){3}$"
-    url_pattern = r"^(http|https)://"
-    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    hash_pattern = r"^[a-fA-F0-9]{32,64}$"
-    
-    if re.match(ip_pattern, value):
-        return "ip"
-    elif re.match(url_pattern, value):
-        return "url"
-    elif re.match(email_pattern, value):
-        return "email"
-    elif re.match(hash_pattern, value):
-        return "hash"
-    else:
-        return "domain"
+# Hàm tạo menu lệnh
+def start(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("🔍 Phân tích IP", callback_data='analyze_ip')],
+        [InlineKeyboardButton("🔹 Kiểm tra URL", callback_data='analyze_url')],
+        [InlineKeyboardButton("🔍 Lấy thông tin domain", callback_data='analyze_domain')],
+        [InlineKeyboardButton("🦠 Phân tích hash file", callback_data='analyze_hash')],
+        [InlineKeyboardButton("📧 Kiểm tra email", callback_data='analyze_email')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Chọn một hành động:', reply_markup=reply_markup)
 
-# Hàm kiểm tra VirusTotal
-def check_virustotal(query, data_type):
-    url = f"https://www.virustotal.com/api/v3/{data_type}s/{query}"
-    headers = {"x-apikey": VT_API_KEY}
+# Hàm gửi request đến VirusTotal
+def check_virustotal(value: str, value_type: str):
+    url = f"https://www.virustotal.com/api/v3/{value_type}/{value}"
+    headers = {"x-apikey": VIRUSTOTAL_API_KEY}
     response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        result = response.json()
-        vt_score = result["data"]["attributes"]["last_analysis_stats"]["malicious"]
-        vt_link = f"https://www.virustotal.com/gui/{data_type}/{query}"
-        return f"🔍 **VirusTotal:**\n- 🔴 Malicious Score: {vt_score}\n- [Xem chi tiết]({vt_link})"
-    return "⚠️ Không tìm thấy trên VirusTotal"
+    return response.json()
 
-# Hàm kiểm tra IBM X-Force Exchange
-def check_ibm(query, data_type):
-    ibm_url = f"https://exchange.xforce.ibmcloud.com/{data_type}/{query}"
-    return f"🔹 **IBM X-Force:**\n- [Xem chi tiết]({ibm_url})"
-
-# Hàm kiểm tra MalwareBazaar (chỉ dành cho hash)
-def check_malwarebazaar(query):
-    bazaar_url = f"https://bazaar.abuse.ch/sample/{query}"
-    return f"🦠 **MalwareBazaar:**\n- [Xem chi tiết]({bazaar_url})"
-
-# Hàm kiểm tra IP trên AbuseIPDB
-def check_abuseipdb(ip):
+# Hàm kiểm tra IP với AbuseIPDB
+def check_abuseipdb(ip: str):
     url = "https://api.abuseipdb.com/api/v2/check"
-    headers = {
-        "Accept": "application/json",
-        "Key": ABUSEIPDB_API_KEY
-    }
-    params = {"ipAddress": ip}
+    params = {"ipAddress": ip, "maxAgeInDays": 90}
+    headers = {"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"}
     response = requests.get(url, headers=headers, params=params)
-    
-    if response.status_code == 200:
-        result = response.json()
-        abuse_score = result["data"]["abuseConfidenceScore"]
-        abuse_link = f"https://www.abuseipdb.com/check/{ip}"
-        return f"🛡️ **AbuseIPDB:**\n- 🔴 Abuse Score: {abuse_score}\n- [Xem chi tiết]({abuse_link})"
-    return "⚠️ Không tìm thấy trên AbuseIPDB"
+    return response.json()
 
-# Xử lý lệnh /check <value>
-async def check(update: Update, context: CallbackContext):
-    if not context.args:
-        await update.message.reply_text("❌ Vui lòng nhập dữ liệu cần kiểm tra.\nVí dụ: `/check 8.8.8.8`")
+# Hàm phân tích IP
+def analyze_ip(update: Update, context: CallbackContext) -> None:
+    ip = context.args[0] if context.args else None
+    if not ip:
+        update.message.reply_text("Vui lòng nhập IP cần kiểm tra.")
         return
-
-    query = context.args[0]
-    data_type = detect_input_type(query)
-
-    results = []
     
-    # Kiểm tra trên VirusTotal
-    results.append(check_virustotal(query, data_type))
+    vt_result = check_virustotal(ip, "ip_addresses")
+    abuse_result = check_abuseipdb(ip)
+    
+    result_text = f"🔍 **Kết quả phân tích IP {ip}:**\n"
+    result_text += f"- VirusTotal: {vt_result.get('data', {}).get('attributes', {}).get('last_analysis_stats', {})}\n"
+    result_text += f"- AbuseIPDB: {abuse_result.get('data', {}).get('abuseConfidenceScore', 'N/A')}% nguy cơ"
+    
+    update.message.reply_text(result_text, parse_mode='Markdown')
 
-    # Kiểm tra trên IBM X-Force
-    results.append(check_ibm(query, data_type))
+# Khởi tạo bot
+app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("analyze_ip", analyze_ip))
 
-    # Kiểm tra trên MalwareBazaar (nếu là hash)
-    if data_type == "hash":
-        results.append(check_malwarebazaar(query))
-
-    # Kiểm tra trên AbuseIPDB (nếu là IP)
-    if data_type == "ip":
-        results.append(check_abuseipdb(query))
-
-    # Gửi kết quả về Telegram
-    await update.message.reply_text("\n\n".join(results), parse_mode="Markdown")
-
-# Hàm chính khởi chạy bot
-def main():
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    app.add_handler(CommandHandler("check", check))
-
-    print("🤖 Bot đang chạy...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# Chạy bot
+print("Bot đang chạy...")
+app.run_polling()
